@@ -260,8 +260,148 @@ async function getCart(req, res, next) {
   }
 }
 
+/**
+ * Remove a single item from cart
+ * POST /api/cart/remove
+ *
+ * Request Body:
+ * {
+ *   "productId": "PRODUCT_ID"
+ * }
+ */
+async function removeFromCart(req, res, next) {
+  try {
+    const { productId } = req.body;
+    const userId = req.userId; // From middleware
+
+    if (!productId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Product ID is required',
+      });
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(productId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid product ID format',
+      });
+    }
+
+    const cart = await Cart.findOne({ userId });
+
+    if (!cart) {
+      return res.status(404).json({
+        success: false,
+        message: 'Cart not found',
+      });
+    }
+
+    let itemRemoved = false;
+
+    // Iterate vendors and items to remove the product
+    cart.vendors = cart.vendors
+      .map((vendor) => {
+        const filteredItems = vendor.items.filter(
+          (item) => item.productId.toString() !== productId.toString(),
+        );
+
+        if (filteredItems.length !== vendor.items.length) {
+          itemRemoved = true;
+        }
+
+        return {
+          ...vendor.toObject?.() || vendor,
+          items: filteredItems,
+          vendorSubTotal: filteredItems.reduce((sum, item) => sum + item.total, 0),
+        };
+      })
+      // Remove vendor groups with no items
+      .filter((vendor) => vendor.items && vendor.items.length > 0);
+
+    if (!itemRemoved) {
+      return res.status(404).json({
+        success: false,
+        message: 'Item not found in cart',
+      });
+    }
+
+    // Recalculate grand total
+    cart.grandTotal = cart.vendors.reduce(
+      (sum, vendor) => sum + vendor.vendorSubTotal,
+      0,
+    );
+
+    // If cart is now empty, you can either keep it with 0 totals or delete it.
+    if (cart.vendors.length === 0) {
+      await Cart.findByIdAndDelete(cart._id);
+      return res.json({
+        success: true,
+        message: 'Item removed and cart is now empty',
+        cart: {
+          vendors: [],
+          grandTotal: 0,
+        },
+      });
+    }
+
+    await cart.save();
+
+    return res.json({
+      success: true,
+      message: 'Item removed from cart successfully',
+      cart: {
+        vendors: cart.vendors,
+        grandTotal: cart.grandTotal,
+      },
+    });
+  } catch (error) {
+    console.error('Error in removeFromCart:', error);
+    return next(error);
+  }
+}
+
+/**
+ * Clear entire cart
+ * POST /api/cart/clear
+ */
+async function clearCart(req, res, next) {
+  try {
+    const userId = req.userId; // From middleware
+
+    const cart = await Cart.findOne({ userId });
+
+    if (!cart) {
+      return res.json({
+        success: true,
+        message: 'Cart is already empty',
+        cart: {
+          vendors: [],
+          grandTotal: 0,
+        },
+      });
+    }
+
+    await Cart.findByIdAndDelete(cart._id);
+
+    return res.json({
+      success: true,
+      message: 'Cart cleared successfully',
+      cart: {
+        vendors: [],
+        grandTotal: 0,
+      },
+    });
+  } catch (error) {
+    console.error('Error in clearCart:', error);
+    return next(error);
+  }
+}
+
 module.exports = {
   addToCart,
   getCart,
+  removeFromCart,
+  clearCart,
 };
 

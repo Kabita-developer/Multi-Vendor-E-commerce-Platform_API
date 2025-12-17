@@ -6,6 +6,15 @@ const { resizeImage, getResizedFileName } = require('../utils/imageResize');
 const { generateSlug } = require('../../Category_And_Brand/utils/slugGenerator');
 const path = require('path');
 
+// ElasticSearch sync service (optional - fails gracefully if ElasticSearch is not available)
+let syncService;
+try {
+  syncService = require('../../Searching_Algorithms/services/syncService');
+} catch (error) {
+  console.warn('ElasticSearch sync service not available:', error.message);
+  syncService = null;
+}
+
 /**
  * Create a new product
  * POST /api/vendor/products
@@ -158,7 +167,19 @@ async function createProduct(req, res, next) {
     // Step 6: Upload mainImage to S3 in three sizes (original, 100px, 200px)
     let mainImageUrls = {};
     try {
-      const mainImageFile = req.files.mainImage[0];
+      const mainImageFile =
+        req.files && req.files.mainImage && req.files.mainImage[0]
+          ? req.files.mainImage[0]
+          : null;
+
+      if (!mainImageFile) {
+        return res.status(400).json({
+          success: false,
+          message:
+            'Main image file is required. Please send it as form-data field "mainImage" with a valid image file (JPG, PNG, WebP).',
+        });
+      }
+
       const originalBuffer = mainImageFile.buffer;
       const originalName = mainImageFile.originalname;
 
@@ -243,7 +264,14 @@ async function createProduct(req, res, next) {
         isActive: true,
       });
 
-      // Step 10: Return success response
+      // Step 10: Sync to ElasticSearch (non-blocking)
+      if (syncService && product.isActive) {
+        syncService.indexProduct(product).catch((syncError) => {
+          console.error('ElasticSearch sync error (non-blocking):', syncError.message);
+        });
+      }
+
+      // Step 11: Return success response
       return res.status(201).json({
         success: true,
         message: 'Product added successfully',
@@ -545,6 +573,13 @@ async function updateProduct(req, res, next) {
 
     await product.save();
 
+    // Sync to ElasticSearch (non-blocking)
+    if (syncService) {
+      syncService.updateProductInIndex(product).catch((syncError) => {
+        console.error('ElasticSearch sync error (non-blocking):', syncError.message);
+      });
+    }
+
     return res.json({
       success: true,
       message: 'Product updated successfully',
@@ -585,6 +620,13 @@ async function deleteProduct(req, res, next) {
 
     product.isActive = false;
     await product.save();
+
+    // Remove from ElasticSearch (non-blocking)
+    if (syncService) {
+      syncService.removeProductFromIndex(product._id.toString()).catch((syncError) => {
+        console.error('ElasticSearch sync error (non-blocking):', syncError.message);
+      });
+    }
 
     return res.json({
       success: true,

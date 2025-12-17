@@ -506,14 +506,14 @@ POST /api/cart/add
 
 ```bash
 # Add item with quantity 2
-POST /api/cart/add
+POST /api/cart/update
 {
   "productId": "694129c27f75e93fd924715d",
   "quantity": 2
 }
 
 # Add same item again with quantity 1 (total becomes 3)
-POST /api/cart/add
+POST /api/cart/update
 {
   "productId": "694129c27f75e93fd924715d",
   "quantity": 1
@@ -528,16 +528,150 @@ GET /api/cart
 
 ---
 
+## REMOVE ITEM FROM CART
+
+### Endpoint
+
+`POST /api/cart/remove`
+
+### Authentication
+
+- **Required:** Yes (JWT Token)
+- **Role:** Customer
+- **Token Location:** `Authorization: Bearer <jwt-token>`
+
+### Request Headers
+
+```
+Authorization: Bearer <jwt-token>
+Content-Type: application/json
+```
+
+### Request Body
+
+| Field       | Type   | Required | Description                    |
+|------------|--------|----------|--------------------------------|
+| `productId` | String | Yes      | Product ID to remove from cart |
+
+### Request Example
+
+```bash
+POST /api/cart/remove
+{
+  "productId": "694129c27f75e93fd924715d"
+}
+```
+
+### Controller Logic
+
+1. Verify JWT token and ensure role === "customer"
+2. Validate `productId` format
+3. Find cart by `userId`
+4. Iterate vendor groups and remove the item with matching `productId`
+5. Remove vendor groups that have no items left
+6. Recalculate `vendorSubTotal` for each vendor and `grandTotal` for the cart
+7. If cart becomes empty, delete the cart document
+8. Return updated cart response
+
+### Success Response
+
+```json
+{
+  "success": true,
+  "message": "Item removed from cart successfully",
+  "cart": {
+    "vendors": [
+      {
+        "vendor": { "id": "VENDOR_ID", "shopName": "Tech Store" },
+        "items": [
+          {
+            "productId": "OTHER_PRODUCT_ID",
+            "name": "Another Product",
+            "price": 999.99,
+            "quantity": 1,
+            "total": 999.99
+          }
+        ],
+        "vendorSubTotal": 999.99
+      }
+    ],
+    "grandTotal": 999.99
+  }
+}
+```
+
+### Notes
+
+1. If the specified item is not found in the cart, API returns `404` with message `"Item not found in cart"`.
+2. If removing the item makes the cart empty, the cart document is deleted and an empty cart structure is returned.
+
+---
+
+## CLEAR CART
+
+### Endpoint
+
+`POST /api/cart/clear`
+
+### Authentication
+
+- **Required:** Yes (JWT Token)
+- **Role:** Customer
+- **Token Location:** `Authorization: Bearer <jwt-token>`
+
+### Request Headers
+
+```
+Authorization: Bearer <jwt-token>
+Content-Type: application/json
+```
+
+### Request Body
+
+No body required.
+
+### Request Example
+
+```bash
+POST /api/cart/clear
+```
+
+### Controller Logic
+
+1. Verify JWT token and ensure role === "customer"
+2. Find cart by `userId`
+3. If cart exists, delete cart document
+4. If cart does not exist, treat as already empty
+5. Return success response with empty cart structure
+
+### Success Response
+
+```json
+{
+  "success": true,
+  "message": "Cart cleared successfully",
+  "cart": {
+    "vendors": [],
+    "grandTotal": 0
+  }
+}
+```
+
+### Notes
+
+1. Idempotent: calling this API multiple times keeps cart empty and always returns success.
+2. Safe to call before checkout to reset cart state.
+
+---
+
 ## Future Enhancements
 
-1. **Update Item Quantity:** API to update quantity of existing cart item
-2. **Remove Item:** API to remove item from cart
-3. **Clear Cart:** API to clear entire cart
-4. **Cart Expiry:** Automatic cart cleanup after inactivity
-5. **Save for Later:** Save items for later purchase
-6. **Cart Sharing:** Share cart with others
-7. **Bulk Operations:** Add multiple items at once
-8. **Cart Validation:** Validate cart before checkout
+1. **Update Item Quantity:** Separate API to set exact quantity (not just add)
+2. **Cart Expiry:** Automatic cart cleanup after inactivity
+3. **Save for Later:** Save items for later purchase
+4. **Cart Sharing:** Share cart with others
+5. **Bulk Operations:** Add multiple items at once
+6. **Cart Validation:** Validate cart before checkout
 
 ---
 
