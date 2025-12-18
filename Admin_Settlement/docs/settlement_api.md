@@ -42,7 +42,7 @@ Content-Type: application/json
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `withdrawalRequestId` | String | Yes | Withdrawal request ID to process |
+| `withdrawalRequestId` | String | Yes | Withdrawal request ID to process (also accepts `requestId` as alias) |
 | `paymentReference` | String | Yes | Bank UTR or payment reference number |
 
 ### Request Example
@@ -50,6 +50,15 @@ Content-Type: application/json
 ```json
 {
   "withdrawalRequestId": "694129c27f75e93fd924715d",
+  "paymentReference": "UTR12345678901234567890"
+}
+```
+
+**Alternative field name (also accepted):**
+
+```json
+{
+  "requestId": "694129c27f75e93fd924715d",
   "paymentReference": "UTR12345678901234567890"
 }
 ```

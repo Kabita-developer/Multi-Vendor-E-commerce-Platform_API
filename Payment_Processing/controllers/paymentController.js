@@ -107,6 +107,7 @@ async function createPayment(req, res, next) {
       });
     } catch (gatewayError) {
       await session.abortTransaction();
+      console.error('Payment gateway error:', gatewayError);
       return res.status(500).json({
         success: false,
         message: 'Failed to create payment order with gateway',

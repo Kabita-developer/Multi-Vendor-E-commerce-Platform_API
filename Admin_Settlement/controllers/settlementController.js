@@ -12,7 +12,9 @@ async function processSettlement(req, res, next) {
 
   try {
     const { vendorId } = req.params;
-    const { withdrawalRequestId, paymentReference } = req.body;
+    // Accept both 'withdrawalRequestId' and 'requestId' for flexibility
+    const withdrawalRequestId = req.body.withdrawalRequestId || req.body.requestId;
+    const { paymentReference } = req.body;
     const user = req.user; // From middleware (id, role, email)
 
     // Validate vendorId
@@ -29,7 +31,7 @@ async function processSettlement(req, res, next) {
       await session.abortTransaction();
       return res.status(400).json({
         success: false,
-        message: 'Valid withdrawal request ID is required',
+        message: 'Valid withdrawal request ID is required (use "withdrawalRequestId" or "requestId" field)',
       });
     }
 

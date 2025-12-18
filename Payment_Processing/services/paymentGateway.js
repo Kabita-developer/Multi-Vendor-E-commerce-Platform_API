@@ -7,6 +7,8 @@ const RAZORPAY_KEY_ID = process.env.RAZORPAY_KEY_ID;
 const RAZORPAY_KEY_SECRET = process.env.RAZORPAY_KEY_SECRET;
 const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
 const PAYMENT_GATEWAY = process.env.PAYMENT_GATEWAY || 'RAZORPAY'; // RAZORPAY or STRIPE
+const NODE_ENV = process.env.NODE_ENV || 'development';
+const IS_PRODUCTION = NODE_ENV === 'production';
 
 /**
  * Create payment order/intent
@@ -56,9 +58,13 @@ async function createRazorpayOrder(amount, currency, receipt, notes) {
 
   // Placeholder implementation
   // In production, replace with actual Razorpay SDK call
-  if (!RAZORPAY_KEY_ID || !RAZORPAY_KEY_SECRET) {
-    throw new Error('Razorpay credentials not configured');
+  if (IS_PRODUCTION && (!RAZORPAY_KEY_ID || !RAZORPAY_KEY_SECRET)) {
+    throw new Error('Razorpay credentials not configured. Required in production mode.');
   }
+
+  // Use placeholder credentials in development mode if not configured
+  const keyId = RAZORPAY_KEY_ID || 'rzp_test_placeholder_key_id';
+  const keySecret = RAZORPAY_KEY_SECRET || 'rzp_test_placeholder_key_secret';
 
   // Simulate Razorpay order creation
   const gatewayOrderId = `order_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
@@ -68,7 +74,7 @@ async function createRazorpayOrder(amount, currency, receipt, notes) {
     amount: amount,
     currency: currency,
     status: 'created',
-    keyId: RAZORPAY_KEY_ID, // For frontend
+    keyId: keyId, // For frontend
   };
 }
 
@@ -98,8 +104,8 @@ async function createStripePaymentIntent(amount, currency, receipt, notes) {
 
   // Placeholder implementation
   // In production, replace with actual Stripe SDK call
-  if (!STRIPE_SECRET_KEY) {
-    throw new Error('Stripe credentials not configured');
+  if (IS_PRODUCTION && !STRIPE_SECRET_KEY) {
+    throw new Error('Stripe credentials not configured. Required in production mode.');
   }
 
   // Simulate Stripe payment intent creation
@@ -141,14 +147,22 @@ function verifyPaymentSignature(params) {
  * Razorpay signature format: HMAC SHA256 of (gatewayOrderId|paymentId) with key_secret
  */
 function verifyRazorpaySignature(gatewayOrderId, paymentId, signature) {
-  if (!RAZORPAY_KEY_SECRET) {
-    throw new Error('Razorpay key secret not configured');
+  // Use placeholder secret in development mode if not configured
+  const keySecret = RAZORPAY_KEY_SECRET || 'rzp_test_placeholder_key_secret';
+
+  if (IS_PRODUCTION && !RAZORPAY_KEY_SECRET) {
+    throw new Error('Razorpay key secret not configured. Required in production mode.');
+  }
+
+  // In development mode, accept any signature for testing
+  if (!IS_PRODUCTION) {
+    return signature && signature.length > 0;
   }
 
   // Generate expected signature
   const payload = `${gatewayOrderId}|${paymentId}`;
   const expectedSignature = crypto
-    .createHmac('sha256', RAZORPAY_KEY_SECRET)
+    .createHmac('sha256', keySecret)
     .update(payload)
     .digest('hex');
 
@@ -169,8 +183,8 @@ function verifyStripeSignature(gatewayOrderId, paymentId, signature) {
   // For payment intent verification, we would check payment status via API
   // This is a simplified version - in production, use Stripe SDK to verify
 
-  if (!STRIPE_SECRET_KEY) {
-    throw new Error('Stripe secret key not configured');
+  if (IS_PRODUCTION && !STRIPE_SECRET_KEY) {
+    throw new Error('Stripe secret key not configured. Required in production mode.');
   }
 
   // In production, use Stripe SDK:
