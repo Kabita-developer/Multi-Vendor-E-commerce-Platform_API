@@ -74,7 +74,7 @@ const OrderSchema = new Schema(
     },
     orderStatus: {
       type: String,
-      enum: ['PENDING', 'CONFIRMED', 'PACKED', 'PROCESSING', 'SHIPPED', 'DELIVERED', 'CANCELLED'],
+      enum: ['PENDING', 'CONFIRMED', 'PACKED', 'PROCESSING', 'SHIPPED', 'DELIVERED', 'CANCELLED', 'RETURNED'],
       default: 'PENDING',
       index: true,
     },
@@ -131,6 +131,75 @@ const OrderSchema = new Schema(
         default: false,
       },
     },
+    // Cancellation fields
+    cancelReason: {
+      type: String,
+      trim: true,
+    },
+    cancelledAt: {
+      type: Date,
+    },
+    cancelledBy: {
+      type: String,
+      enum: ['customer', 'admin', 'super-admin'],
+    },
+    cancelledByUserId: {
+      type: Schema.Types.ObjectId,
+    },
+    // Return fields
+    returnReason: {
+      type: String,
+      trim: true,
+    },
+    returnType: {
+      type: String,
+      enum: ['refund', 'replacement'],
+    },
+    returnStatus: {
+      type: String,
+      enum: ['REQUESTED', 'APPROVED', 'PICKUP_COMPLETED', 'COMPLETED', 'REJECTED'],
+      index: true,
+    },
+    returnRequestedAt: {
+      type: Date,
+    },
+    returnApprovedAt: {
+      type: Date,
+    },
+    returnApprovedBy: {
+      type: Schema.Types.ObjectId,
+    },
+    pickupCompletedAt: {
+      type: Date,
+    },
+    returnCompletedAt: {
+      type: Date,
+    },
+    // Refund fields
+    refundStatus: {
+      type: String,
+      enum: ['NOT_REQUIRED', 'PENDING', 'COMPLETED', 'FAILED'],
+      default: 'NOT_REQUIRED',
+      index: true,
+    },
+    refundAmount: {
+      type: Number,
+      min: [0, 'Refund amount cannot be negative'],
+    },
+    refundInitiatedAt: {
+      type: Date,
+    },
+    refundCompletedAt: {
+      type: Date,
+    },
+    refundReference: {
+      type: String,
+      trim: true,
+    },
+    refundFailureReason: {
+      type: String,
+      trim: true,
+    },
     statusHistory: [
       {
         status: {
@@ -140,7 +209,7 @@ const OrderSchema = new Schema(
         updatedBy: {
           type: String,
           required: true,
-          enum: ['vendor', 'admin', 'super-admin', 'system'],
+          enum: ['vendor', 'admin', 'super-admin', 'system', 'customer'],
         },
         updatedByUserId: {
           type: Schema.Types.ObjectId,

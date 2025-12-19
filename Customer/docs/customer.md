@@ -383,3 +383,472 @@ The following indexes are optimized for this API:
 3. **Caching:** Consider implementing caching for frequently accessed queries
 4. **Rate Limiting:** Implement rate limiting for production use
 
+---
+
+# Customer Profile Picture API
+
+## Overview
+
+This document describes the Customer Profile Picture API. This API allows authenticated customers to upload, view, and delete their profile pictures.
+
+**Base URL:** `/api/customer`
+
+**Authentication:** All profile picture endpoints require JWT authentication with customer role.
+
+---
+
+## UPLOAD PROFILE PICTURE
+
+### Endpoint
+
+`POST /api/customer/profile/picture`
+
+### Authentication
+
+- **Required:** Yes (JWT Token)
+- **Role:** Customer
+- **Token Location:** `Authorization: Bearer <jwt-token>`
+
+### Access Rules
+
+- Only authenticated customers can upload their own profile picture
+- Customer ID is extracted from JWT token
+- Profile picture replaces any existing picture
+
+### Request Headers
+
+```
+Authorization: Bearer <jwt-token>
+Content-Type: multipart/form-data
+```
+
+### Request Body (Form Data)
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `profilePicture` | File | Yes | Image file (JPG, PNG, WebP) - Max 5MB |
+
+### Request Example
+
+#### Using cURL
+
+```bash
+curl -X POST http://localhost:3000/api/customer/profile/picture \
+  -H "Authorization: Bearer <your-jwt-token>" \
+  -F "profilePicture=@/path/to/image.jpg"
+```
+
+#### Using JavaScript (FormData)
+
+```javascript
+const formData = new FormData();
+formData.append('profilePicture', fileInput.files[0]);
+
+fetch('http://localhost:3000/api/customer/profile/picture', {
+  method: 'POST',
+  headers: {
+    'Authorization': `Bearer ${token}`
+  },
+  body: formData
+});
+```
+
+### Controller Logic (Step by Step)
+
+1. **Authenticate customer** using JWT token (via middleware)
+2. **Validate file** is provided in request
+3. **Find customer** by ID from token
+4. **Upload original image** to S3 (customers/profile-pictures folder)
+5. **Resize and upload 100px version** to S3
+6. **Resize and upload 200px version** to S3
+7. **Update customer** profilePicture field with all three URLs
+8. **Save customer** document
+9. **Return success response** with profile picture URLs
+
+### Success Response
+
+**Status Code:** `200 OK`
+
+```json
+{
+  "success": true,
+  "message": "Profile picture uploaded successfully",
+  "data": {
+    "profilePicture": {
+      "original": "https://bucket.s3.amazonaws.com/customers/profile-pictures/uuid-original.jpg",
+      "size100": "https://bucket.s3.amazonaws.com/customers/profile-pictures/uuid_100px.jpg",
+      "size200": "https://bucket.s3.amazonaws.com/customers/profile-pictures/uuid_200px.jpg"
+    }
+  }
+}
+```
+
+### Response Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `success` | Boolean | Indicates if the request was successful |
+| `message` | String | Success message |
+| `data` | Object | Response data |
+| `data.profilePicture` | Object | Profile picture URLs |
+| `data.profilePicture.original` | String | Original size image URL |
+| `data.profilePicture.size100` | String | 100px width image URL |
+| `data.profilePicture.size200` | String | 200px width image URL |
+
+### Error Responses
+
+#### Missing File
+
+**Status Code:** `400 Bad Request`
+
+```json
+{
+  "success": false,
+  "message": "Profile picture file is required. Please send it as form-data field \"profilePicture\" with a valid image file (JPG, PNG, WebP)."
+}
+```
+
+#### Invalid File Type
+
+**Status Code:** `400 Bad Request`
+
+```json
+{
+  "success": false,
+  "message": "Invalid file type. Only JPG, PNG, and WebP images are allowed."
+}
+```
+
+#### File Too Large
+
+**Status Code:** `400 Bad Request`
+
+```json
+{
+  "success": false,
+  "message": "File size too large. Maximum size is 5MB."
+}
+```
+
+#### Missing Authorization
+
+**Status Code:** `401 Unauthorized`
+
+```json
+{
+  "success": false,
+  "message": "Authorization header is required"
+}
+```
+
+#### Customer Not Found
+
+**Status Code:** `404 Not Found`
+
+```json
+{
+  "success": false,
+  "message": "Customer not found"
+}
+```
+
+#### S3 Upload Error
+
+**Status Code:** `500 Internal Server Error`
+
+```json
+{
+  "success": false,
+  "message": "Failed to upload profile picture to S3"
+}
+```
+
+---
+
+## GET PROFILE
+
+### Endpoint
+
+`GET /api/customer/profile`
+
+### Authentication
+
+- **Required:** Yes (JWT Token)
+- **Role:** Customer
+- **Token Location:** `Authorization: Bearer <jwt-token>`
+
+### Access Rules
+
+- Only authenticated customers can view their own profile
+- Customer ID is extracted from JWT token
+
+### Request Headers
+
+```
+Authorization: Bearer <jwt-token>
+```
+
+### Request Example
+
+```bash
+curl -X GET http://localhost:3000/api/customer/profile \
+  -H "Authorization: Bearer <your-jwt-token>"
+```
+
+### Success Response
+
+**Status Code:** `200 OK`
+
+```json
+{
+  "success": true,
+  "data": {
+    "customer": {
+      "id": "694129c27f75e93fd924715d",
+      "name": "Rahul Sharma",
+      "email": "rahul@example.com",
+      "phone": "9876543210",
+      "role": "customer",
+      "address": {
+        "street": "12 MG Road",
+        "city": "Kolkata",
+        "state": "West Bengal",
+        "pincode": "700001",
+        "country": "India"
+      },
+      "profilePicture": {
+        "original": "https://bucket.s3.amazonaws.com/customers/profile-pictures/uuid-original.jpg",
+        "size100": "https://bucket.s3.amazonaws.com/customers/profile-pictures/uuid_100px.jpg",
+        "size200": "https://bucket.s3.amazonaws.com/customers/profile-pictures/uuid_200px.jpg"
+      },
+      "createdAt": "2024-01-15T10:30:00.000Z",
+      "updatedAt": "2024-01-15T12:45:00.000Z"
+    }
+  }
+}
+```
+
+### Response Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `success` | Boolean | Indicates if the request was successful |
+| `data` | Object | Response data |
+| `data.customer` | Object | Customer profile information |
+| `data.customer.id` | String | Customer ID |
+| `data.customer.name` | String | Customer name |
+| `data.customer.email` | String | Customer email |
+| `data.customer.phone` | String | Customer phone |
+| `data.customer.role` | String | Customer role |
+| `data.customer.address` | Object | Customer address |
+| `data.customer.profilePicture` | Object | Profile picture URLs (null if not set) |
+| `data.customer.createdAt` | String | Account creation date (ISO 8601) |
+| `data.customer.updatedAt` | String | Last update date (ISO 8601) |
+
+---
+
+## DELETE PROFILE PICTURE
+
+### Endpoint
+
+`DELETE /api/customer/profile/picture`
+
+### Authentication
+
+- **Required:** Yes (JWT Token)
+- **Role:** Customer
+- **Token Location:** `Authorization: Bearer <jwt-token>`
+
+### Access Rules
+
+- Only authenticated customers can delete their own profile picture
+- Customer ID is extracted from JWT token
+
+### Request Headers
+
+```
+Authorization: Bearer <jwt-token>
+```
+
+### Request Example
+
+```bash
+curl -X DELETE http://localhost:3000/api/customer/profile/picture \
+  -H "Authorization: Bearer <your-jwt-token>"
+```
+
+### Success Response
+
+**Status Code:** `200 OK`
+
+```json
+{
+  "success": true,
+  "message": "Profile picture deleted successfully"
+}
+```
+
+### Error Responses
+
+#### Missing Authorization
+
+**Status Code:** `401 Unauthorized`
+
+```json
+{
+  "success": false,
+  "message": "Authorization header is required"
+}
+```
+
+#### Customer Not Found
+
+**Status Code:** `404 Not Found`
+
+```json
+{
+  "success": false,
+  "message": "Customer not found"
+}
+```
+
+---
+
+## Database Schema
+
+### Customer Model (Updated)
+
+```javascript
+{
+  name: String,
+  email: String,
+  phone: String,
+  password: String,
+  role: String,
+  address: {
+    street: String,
+    city: String,
+    state: String,
+    pincode: String,
+    country: String
+  },
+  profilePicture: {
+    original: String,      // Original size image URL
+    size100: String,       // 100px width image URL
+    size200: String        // 200px width image URL
+  },
+  resetToken: String,
+  resetTokenExpiresAt: Date,
+  createdAt: Date,
+  updatedAt: Date
+}
+```
+
+---
+
+## Image Processing
+
+### Image Sizes
+
+1. **Original:** Full-size image as uploaded
+2. **Size 100:** Resized to 100px width (maintains aspect ratio)
+3. **Size 200:** Resized to 200px width (maintains aspect ratio)
+
+### Image Storage
+
+- **Location:** S3 bucket under `customers/profile-pictures/` folder
+- **Naming:** UUID-based filenames to prevent conflicts
+- **Format:** Original format preserved (JPG, PNG, WebP)
+
+### Image Resizing
+
+- Uses Sharp library for high-quality image resizing
+- Maintains aspect ratio
+- Does not enlarge images smaller than target size
+- Optimized for web performance
+
+---
+
+## File Upload Specifications
+
+### Allowed File Types
+
+- JPEG/JPG (`.jpg`, `.jpeg`)
+- PNG (`.png`)
+- WebP (`.webp`)
+
+### File Size Limit
+
+- **Maximum:** 5MB per file
+- **Recommended:** Under 2MB for faster uploads
+
+### Form Data Field Name
+
+- **Field Name:** `profilePicture`
+- **Type:** File upload
+- **Required:** Yes (for upload endpoint)
+
+---
+
+## Notes
+
+1. **Image Optimization:** Images are automatically resized to multiple sizes for optimal performance
+2. **S3 Storage:** All images are stored in AWS S3 for scalability and reliability
+3. **Replacement:** Uploading a new profile picture replaces the existing one
+4. **Deletion:** Deleting profile picture removes all three image sizes from database (S3 files remain)
+5. **Security:** Only authenticated customers can upload/delete their own profile pictures
+6. **Validation:** File type and size validation performed before upload
+
+---
+
+## Example Use Cases
+
+### Use Case 1: Upload Profile Picture
+
+**Scenario:** Customer wants to set their profile picture
+
+**Request:**
+```bash
+POST /api/customer/profile/picture
+Authorization: Bearer <token>
+Content-Type: multipart/form-data
+Body: profilePicture=<image-file>
+```
+
+**Response:** Returns profile picture URLs in three sizes
+
+### Use Case 2: View Profile
+
+**Scenario:** Customer wants to view their complete profile including profile picture
+
+**Request:**
+```bash
+GET /api/customer/profile
+Authorization: Bearer <token>
+```
+
+**Response:** Returns complete customer profile with profile picture URLs
+
+### Use Case 3: Delete Profile Picture
+
+**Scenario:** Customer wants to remove their profile picture
+
+**Request:**
+```bash
+DELETE /api/customer/profile/picture
+Authorization: Bearer <token>
+```
+
+**Response:** Confirms deletion
+
+---
+
+## Future Enhancements
+
+1. **Image Cropping:** Add client-side image cropping before upload
+2. **S3 Cleanup:** Implement automatic deletion of old images from S3 when replaced
+3. **Image Compression:** Add additional compression for smaller file sizes
+4. **Multiple Formats:** Support additional image formats (GIF, etc.)
+5. **Profile Picture History:** Keep history of previous profile pictures
+6. **Avatar Generation:** Generate default avatars if no picture is uploaded
+

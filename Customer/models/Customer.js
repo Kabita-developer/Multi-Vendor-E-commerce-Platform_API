@@ -20,6 +20,11 @@ const CustomerSchema = new Schema(
       pincode: { type: String, required: true, trim: true },
       country: { type: String, required: true, trim: true },
     },
+    profilePicture: {
+      original: { type: String },
+      size100: { type: String },
+      size200: { type: String },
+    },
     resetToken: { type: String },
     resetTokenExpiresAt: { type: Date },
   },
