@@ -55,8 +55,17 @@ async function checkout(req, res, next) {
       });
     }
 
-    // Fetch cart
-    const cart = await Cart.findOne({ userId }).session(session);
+    // Check if tempCart is provided (from Buy Now flow)
+    // Otherwise, fetch cart from database
+    let cart = req.tempCart;
+    let isTempCart = false;
+
+    if (!cart) {
+      cart = await Cart.findOne({ userId }).session(session);
+    } else {
+      // This is a temporary cart from Buy Now
+      isTempCart = true;
+    }
 
     if (!cart || !cart.vendors || cart.vendors.length === 0) {
       await session.abortTransaction();
@@ -230,8 +239,10 @@ async function checkout(req, res, next) {
       );
     }
 
-    // Clear cart
-    await Cart.findByIdAndDelete(cart._id).session(session);
+    // Clear cart only if it's a database cart (not temp cart from Buy Now)
+    if (!isTempCart && cart._id) {
+      await Cart.findByIdAndDelete(cart._id).session(session);
+    }
 
     // Calculate grand total
     const grandTotal = savedOrders.reduce((sum, order) => sum + order.payableAmount, 0);
