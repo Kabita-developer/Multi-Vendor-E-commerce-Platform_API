@@ -402,6 +402,120 @@ curl -X POST http://localhost:3000/api/orders/checkout \
 
 ---
 
+## Coupon Management (Super Admin Only)
+
+These endpoints are for **Super Admin only**. Use a Super Admin JWT token in:
+
+```
+Authorization: Bearer <jwt-token>
+Content-Type: application/json
+```
+
+### 1) Generate Coupon Code (does not save)
+
+**Endpoint:** `POST /api/admin/coupons/generate-code`
+
+**Request Body (optional):**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `length` | Number | No | Code length (min 4, max 20). Default 8 |
+| `prefix` | String | No | Prefix added before the random code (e.g. `"SAVE"`) |
+
+**Request Example**
+
+```json
+{
+  "length": 8,
+  "prefix": "SAVE"
+}
+```
+
+**Success Response (200)**
+
+```json
+{
+  "success": true,
+  "code": "SAVE7KQ9X2D8"
+}
+```
+
+### 2) Create Coupon (saves to DB)
+
+**Endpoint:** `POST /api/admin/coupons`
+
+**Access Rules**
+- Only **Super Admin** can create coupons
+- Coupon `code` is **auto-generated** if not provided
+
+**Request Body**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `code` | String | No | Custom coupon code (uppercase recommended) |
+| `codeLength` | Number | No | If `code` not provided, generate code with this length (default 8) |
+| `codePrefix` | String | No | If `code` not provided, generate code with this prefix |
+| `description` | String | No | Coupon description |
+| `discountType` | String | Yes | `PERCENTAGE` or `FIXED` |
+| `discountValue` | Number | Yes | Discount value (percentage or fixed amount) |
+| `minPurchaseAmount` | Number | No | Minimum purchase amount required (default 0) |
+| `maxDiscountAmount` | Number | No | Maximum discount (only for `PERCENTAGE`) |
+| `applicableTo` | String | No | `PLATFORM`, `VENDOR`, or `ALL` (default `PLATFORM`) |
+| `vendorId` | String | No | Required only when `applicableTo = VENDOR` |
+| `validFrom` | Date/String | Yes | Coupon start time (ISO date string recommended) |
+| `validUntil` | Date/String | Yes | Coupon end time (ISO date string recommended) |
+| `usageLimit` | Number | No | Max usage count |
+| `isActive` | Boolean | No | Activate/deactivate (default true) |
+
+**Request Example (auto-generate code)**
+
+```json
+{
+  "discountType": "PERCENTAGE",
+  "discountValue": 10,
+  "minPurchaseAmount": 500,
+  "maxDiscountAmount": 200,
+  "applicableTo": "PLATFORM",
+  "validFrom": "2025-12-22T00:00:00.000Z",
+  "validUntil": "2025-12-31T23:59:59.999Z",
+  "usageLimit": 100,
+  "codePrefix": "SAVE",
+  "codeLength": 8,
+  "description": "Year-end sale"
+}
+```
+
+**Success Response (201)**
+
+```json
+{
+  "success": true,
+  "message": "Coupon created",
+  "coupon": {
+    "_id": "MONGO_OBJECT_ID",
+    "code": "SAVE7KQ9X2D8",
+    "discountType": "PERCENTAGE",
+    "discountValue": 10,
+    "minPurchaseAmount": 500,
+    "maxDiscountAmount": 200,
+    "applicableTo": "PLATFORM",
+    "validFrom": "2025-12-22T00:00:00.000Z",
+    "validUntil": "2025-12-31T23:59:59.999Z",
+    "usageLimit": 100,
+    "usedCount": 0,
+    "isActive": true
+  }
+}
+```
+
+**Error Responses**
+- `401 Unauthorized`: Missing/invalid token
+- `403 Forbidden`: Not a Super Admin
+- `400 Bad Request`: Validation errors (missing required fields, invalid dates)
+- `409 Conflict`: Coupon code already exists
+
+---
+
 ## Payment Methods
 
 ### ONLINE Payment

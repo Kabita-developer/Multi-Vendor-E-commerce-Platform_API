@@ -32,6 +32,7 @@ const brandRoutes = require('./Category_And_Brand/routes/brandRoutes');
 const adminCategoryRoutes = require('./Category_And_Brand/routes/adminCategoryRoutes');
 const adminBrandRoutes = require('./Category_And_Brand/routes/adminBrandRoutes');
 const productRoutes = require('./Product/routes/productRoutes');
+const couponRoutes = require('./Checkout_System/routes/couponRoutes');
 const Vendor = require('./Vendor/models/Vendor');
 
 const app = express();
@@ -81,6 +82,7 @@ app.use('/api/payment', paymentRoutes);
 app.use('/api/commission', commissionRoutes);
 app.use('/api/wallet-credit', walletCreditRoutes);
 app.use('/api/vendor/orders', orderFulfillmentRoutes);
+app.use('/api/admin/coupons', couponRoutes);
 // Public routes
 app.use('/api/categories', categoryRoutes);
 app.use('/api/brands', brandRoutes);
